@@ -80,7 +80,8 @@ jobs:
       - name: Build debug APK
         run: |
           cd android
-          ./gradlew assembleDebug --no-daemon --stacktrace --warning-mode=summary
+          set -o pipefail
+          ./gradlew assembleDebug --no-daemon --stacktrace --info --warning-mode=all 2>&1 | tee ../gradle-build.log
 
       - name: Locate APK
         id: apk
@@ -102,12 +103,21 @@ jobs:
           retention-days: 30
           if-no-files-found: error
 
-      - name: Upload Gradle reports on failure
+      - name: Print last 200 lines of Gradle log on failure
+        if: failure()
+        run: |
+          echo "=========== FIN DU LOG GRADLE ==========="
+          tail -n 200 gradle-build.log 2>/dev/null || echo "(pas de log)"
+          echo "=========== RECHERCHE D'ERREURS ==========="
+          grep -nE "FAILED|error:|FAILURE:|What went wrong|Caused by:|> Task" gradle-build.log | tail -n 60 || true
+
+      - name: Upload full Gradle log + reports on failure
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: gradle-reports
+          name: gradle-build-log
           path: |
+            PoidsSuivi/gradle-build.log
             PoidsSuivi/android/app/build/reports/**
             PoidsSuivi/android/**/build/outputs/logs/**
           retention-days: 14
