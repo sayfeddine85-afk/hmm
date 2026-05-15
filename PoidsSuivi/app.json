@@ -19,9 +19,6 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.poidssuivi.app"
-    },
-    "plugins": [
-      "expo-haptics"
-    ]
+    }
   }
 }
