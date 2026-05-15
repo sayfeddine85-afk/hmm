@@ -1,0 +1,27 @@
+{
+  "expo": {
+    "name": "Suivi du poids",
+    "slug": "poids-suivi",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "dark",
+    "newArchEnabled": true,
+    "splash": {
+      "resizeMode": "contain",
+      "backgroundColor": "#0d0d14"
+    },
+    "android": {
+      "package": "com.poidssuivi.app",
+      "adaptiveIcon": {
+        "backgroundColor": "#0d0d14"
+      }
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.poidssuivi.app"
+    },
+    "plugins": [
+      "expo-haptics"
+    ]
+  }
+}
