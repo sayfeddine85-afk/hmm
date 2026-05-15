@@ -62,17 +62,28 @@ complète (ou égale) qu'INITIAL_DATA.
 - **Phase** : Prise / Maintien / Perte (seuils ±0.1 kg/sem)
 - **Objectif** : date estimée selon la pente 30 jours
 
-## Build Android (production)
+## Build Android → APK
 
-`expo build:android` est déprécié. Utiliser **EAS Build** :
+`expo build:android` est déprécié. La voie officielle est **EAS Build** (cloud Expo, gratuit pour les builds occasionnels) :
 
 ```bash
 npm install -g eas-cli
-eas login
-eas build:configure
-eas build --platform android --profile preview      # APK pour install directe
+eas login                                            # compte Expo (gratuit)
+eas build --platform android --profile preview       # → APK installable
 # ou
-eas build --platform android --profile production   # AAB pour le Play Store
+eas build --platform android --profile production    # → AAB pour le Play Store
+```
+
+`eas.json` est déjà configuré : le profil **preview** produit un **APK** (et non un AAB), avec `distribution: "internal"` — tu reçois un lien de téléchargement à la fin du build (~10–15 min). Installe-le sur ton Android via le lien (autoriser les sources inconnues).
+
+### Alternative : build local
+
+Si tu as Android Studio installé (SDK + JDK 17+) :
+
+```bash
+npx expo prebuild --platform android
+cd android
+./gradlew assembleRelease                            # APK dans app/build/outputs/apk/release/
 ```
 
 ## Notes techniques
