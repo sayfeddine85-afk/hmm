@@ -19,6 +19,16 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.poidssuivi.app"
-    }
+    },
+    "plugins": [
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "kotlinVersion": "1.9.25"
+          }
+        }
+      ]
+    ]
   }
 }
