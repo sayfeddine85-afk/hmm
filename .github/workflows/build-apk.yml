@@ -13,7 +13,14 @@ jobs:
   build:
     name: Assemble debug APK
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 60
+    env:
+      # Forcer le runner sur Node 24 — les actions Node 20 sont dépréciées.
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
+      # Plus de heap pour Gradle (RN 0.76 + Skia + new arch sont gourmands).
+      GRADLE_OPTS: '-Dorg.gradle.jvmargs=-Xmx6g -Dorg.gradle.daemon=false'
+      EXPO_OFFLINE: '1'
+
     defaults:
       run:
         working-directory: PoidsSuivi
@@ -35,18 +42,28 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
-      - name: Setup Android SDK
+      - name: Setup Android SDK + NDK + CMake
         uses: android-actions/setup-android@v3
         with:
-          packages: 'platform-tools platforms;android-35 build-tools;35.0.0'
+          packages: >-
+            platform-tools
+            platforms;android-35
+            build-tools;35.0.0
+            ndk;26.1.10909125
+            cmake;3.22.1
 
       - name: Install npm dependencies
         run: npm ci
 
       - name: Expo prebuild (Android)
-        env:
-          EXPO_OFFLINE: '1'
         run: npx expo prebuild --platform android --no-install --clean
+
+      - name: Show generated android/build.gradle
+        run: |
+          echo "--- gradle.properties ---"
+          cat android/gradle.properties || true
+          echo "--- android/build.gradle (head) ---"
+          head -50 android/build.gradle || true
 
       - name: Cache Gradle
         uses: actions/cache@v4
@@ -63,19 +80,35 @@ jobs:
       - name: Build debug APK
         run: |
           cd android
-          ./gradlew assembleDebug --no-daemon --stacktrace
+          ./gradlew assembleDebug --no-daemon --stacktrace --warning-mode=summary
 
       - name: Locate APK
         id: apk
+        if: always()
         run: |
-          APK=$(find android/app/build/outputs/apk -name "*.apk" | head -1)
-          echo "apk=$APK" >> "$GITHUB_OUTPUT"
-          echo "Built: $APK ($(du -h "$APK" | cut -f1))"
+          APK=$(find android/app/build/outputs/apk -name "*.apk" 2>/dev/null | head -1 || true)
+          if [ -n "$APK" ]; then
+            echo "Built: $APK ($(du -h "$APK" | cut -f1))"
+          else
+            echo "No APK found." >&2
+          fi
 
       - name: Upload APK artifact
+        if: success()
         uses: actions/upload-artifact@v4
         with:
           name: PoidsSuivi-debug-apk
           path: PoidsSuivi/android/app/build/outputs/apk/debug/*.apk
           retention-days: 30
           if-no-files-found: error
+
+      - name: Upload Gradle reports on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gradle-reports
+          path: |
+            PoidsSuivi/android/app/build/reports/**
+            PoidsSuivi/android/**/build/outputs/logs/**
+          retention-days: 14
+          if-no-files-found: ignore
