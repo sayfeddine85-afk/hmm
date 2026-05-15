@@ -11,7 +11,7 @@ on:
 
 jobs:
   build:
-    name: Assemble debug APK
+    name: Assemble release APK
     runs-on: ubuntu-latest
     timeout-minutes: 60
     env:
@@ -77,11 +77,11 @@ jobs:
       - name: Make gradlew executable
         run: chmod +x android/gradlew
 
-      - name: Build debug APK
+      - name: Build release APK (signed with debug key for standalone install)
         run: |
           cd android
           set -o pipefail
-          ./gradlew assembleDebug --no-daemon --stacktrace --info --warning-mode=all 2>&1 | tee ../gradle-build.log
+          ./gradlew assembleRelease --no-daemon --stacktrace --info --warning-mode=summary 2>&1 | tee ../gradle-build.log
 
       - name: Locate APK
         id: apk
@@ -98,8 +98,8 @@ jobs:
         if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: PoidsSuivi-debug-apk
-          path: PoidsSuivi/android/app/build/outputs/apk/debug/*.apk
+          name: PoidsSuivi-release-apk
+          path: PoidsSuivi/android/app/build/outputs/apk/release/*.apk
           retention-days: 30
           if-no-files-found: error
 
