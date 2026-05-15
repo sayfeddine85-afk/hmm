@@ -1,0 +1,81 @@
+name: Build Android APK
+
+on:
+  push:
+    branches:
+      - claude/weight-tracking-app-gO7VO
+    paths:
+      - 'PoidsSuivi/**'
+      - '.github/workflows/build-apk.yml'
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Assemble debug APK
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    defaults:
+      run:
+        working-directory: PoidsSuivi
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: PoidsSuivi/package-lock.json
+
+      - name: Setup JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: 'platform-tools platforms;android-35 build-tools;35.0.0'
+
+      - name: Install npm dependencies
+        run: npm ci
+
+      - name: Expo prebuild (Android)
+        env:
+          EXPO_OFFLINE: '1'
+        run: npx expo prebuild --platform android --no-install --clean
+
+      - name: Cache Gradle
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-${{ runner.os }}-${{ hashFiles('PoidsSuivi/android/**/*.gradle*', 'PoidsSuivi/android/gradle/wrapper/gradle-wrapper.properties') }}
+          restore-keys: gradle-${{ runner.os }}-
+
+      - name: Make gradlew executable
+        run: chmod +x android/gradlew
+
+      - name: Build debug APK
+        run: |
+          cd android
+          ./gradlew assembleDebug --no-daemon --stacktrace
+
+      - name: Locate APK
+        id: apk
+        run: |
+          APK=$(find android/app/build/outputs/apk -name "*.apk" | head -1)
+          echo "apk=$APK" >> "$GITHUB_OUTPUT"
+          echo "Built: $APK ($(du -h "$APK" | cut -f1))"
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: PoidsSuivi-debug-apk
+          path: PoidsSuivi/android/app/build/outputs/apk/debug/*.apk
+          retention-days: 30
+          if-no-files-found: error
