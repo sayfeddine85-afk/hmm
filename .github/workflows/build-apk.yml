@@ -54,6 +54,9 @@ jobs:
       - name: Install npm dependencies
         run: npm ci
 
+      - name: Unit tests
+        run: npx jest --ci
+
       - name: Expo prebuild (Android)
         run: |
           echo "--- before prebuild ---"

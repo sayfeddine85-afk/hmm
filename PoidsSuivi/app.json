@@ -2,17 +2,21 @@
   "expo": {
     "name": "Suivi du poids",
     "slug": "poids-suivi",
-    "version": "1.0.0",
+    "version": "1.1.0",
     "orientation": "portrait",
+    "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
     "newArchEnabled": true,
     "splash": {
+      "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
       "backgroundColor": "#0d0d14"
     },
     "android": {
       "package": "com.poidssuivi.app",
+      "versionCode": 2,
       "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#0d0d14"
       }
     },

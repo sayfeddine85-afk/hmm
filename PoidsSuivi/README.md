@@ -11,10 +11,12 @@ PoidsSuivi/
 ├── App.js                    # Navigation par onglets
 ├── app.json                  # Config Expo (theme dark, package Android)
 ├── babel.config.js           # Avec plugin Reanimated
+├── assets/                   # icône, icône adaptative, splash
+├── __tests__/                # tests Jest
 ├── src/
-│   ├── screens/              # 4 écrans : Home, Add, Chart, History
+│   ├── screens/              # 5 écrans : Home, Add, Chart, History, Settings
 │   ├── components/           # StatCard, MA5Badge, WeightChart
-│   ├── utils/                # dates.js, calculations.js (MA5, trend, peaks)
+│   ├── utils/                # calculs, dates, CSV, fichiers, notifications
 │   ├── storage/              # store.js + INITIAL_DATA (53 pesées)
 │   └── theme/colors.js       # palette centralisée
 ```
@@ -36,20 +38,30 @@ Scanner le QR code avec **Expo Go** sur Android (API 29+).
 
 ## Fonctionnalités
 
-- **🏠 Accueil** : poids du jour, 4 cartes stats (Poids/MA5/Δ MA5/Min-Max),
-  graphique compact (20 dernières), badges MA5 scrollables, référence éditable, FAB +
-- **➕ Ajouter** : DatePicker natif Android, validation 50–150 kg, anti-doublon,
-  preview MA5 en direct, haptic, bouton « Annuler la dernière saisie »
-- **📊 Graphique** : plein écran, segments 7j/30j/3 mois/Tout, tooltip au tap,
-  pics colorés en rouge, ligne objectif si défini
-- **📋 Historique** : tendance 7j/30j, phrase synthétique, streak + régularité du mois,
-  objectif (date estimée), liste swipeable, export CSV via le menu de partage Android
+- **Accueil** : dernière pesée, bandeau si pas encore pesé aujourd'hui, cartes MA5 / Δ MA5 /
+  Min-Max / IMC, graphique des 20 dernières pesées, badges MA5, bouton +
+- **Ajouter** : date native, boutons −/+ 0,1 kg partant de la dernière pesée, écart vs dernière
+  pesée, aperçu MA5, anti-doublon, annulation de la dernière saisie
+- **Graphique** : 7 j / 30 j / 3 mois / Tout (jours calendaires), tooltip au toucher, pics en rouge,
+  ligne objectif + référence, stats de la période (moyenne, min, max, variation)
+- **Historique** : tendance 7 j / 30 j, phase, comparaison mois courant vs précédent, streak et
+  régularité, objectif avec date estimée ; toucher une ligne pour la modifier, glisser pour la
+  supprimer (avec « Annuler » pendant 5 s)
+- **Réglages** : rappel quotidien (notification locale à l'heure choisie), taille pour l'IMC,
+  ligne de référence, import CSV (fusion ou remplacement) et export CSV
+
+## Tests
+
+```bash
+npm test      # calculs (MA5, tendance, IMC, périodes…) et import/export CSV
+```
+
+Les tests tournent aussi dans GitHub Actions avant chaque build d'APK.
 
 ## Données initiales
 
 53 pesées du 08/03/2026 au 15/05/2026 sont préchargées au premier démarrage.
-Au démarrage suivant, on conserve la sauvegarde locale dès qu'elle est plus
-complète (ou égale) qu'INITIAL_DATA.
+Ensuite, la sauvegarde locale fait toujours foi (suppressions comprises).
 
 ## Calculs (`src/utils/calculations.js`)
 

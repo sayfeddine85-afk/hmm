@@ -31,9 +31,8 @@ export const loadEntries = async () => {
     if (!raw) return INITIAL_DATA;
     const parsed = JSON.parse(raw);
     if (!Array.isArray(parsed)) return INITIAL_DATA;
-    // On garde le jeu le plus complet pour ne jamais perdre de saisies utilisateur.
-    const chosen = parsed.length >= INITIAL_DATA.length ? parsed : INITIAL_DATA;
-    return sortByDateAsc(chosen);
+    // Une sauvegarde existante fait foi, même plus courte (suppressions volontaires).
+    return sortByDateAsc(parsed);
   } catch {
     return INITIAL_DATA;
   }
@@ -96,3 +95,48 @@ export const setReference = async (value) => {
 };
 
 export const DEFAULT_REFERENCE = DEFAULT_REF;
+
+// Modifie le poids d'une pesée existante.
+export const updateEntry = async (dateIso, poids) => {
+  const current = await loadEntries();
+  return saveEntries(current.map((e) => (e.date === dateIso ? { ...e, poids } : e)));
+};
+
+// Réinsère une pesée supprimée (annulation).
+export const restoreEntry = async (entry) => {
+  const current = await loadEntries();
+  if (current.some((e) => e.date === entry.date)) return current;
+  return saveEntries([...current, { date: entry.date, poids: entry.poids }]);
+};
+
+// Import : 'merge' (les dates importées écrasent les existantes) ou 'replace'.
+export const importEntries = async (imported, mode = 'merge') => {
+  if (mode === 'replace') return saveEntries(imported);
+  const byDate = new Map((await loadEntries()).map((e) => [e.date, e]));
+  imported.forEach((e) => byDate.set(e.date, { date: e.date, poids: e.poids }));
+  return saveEntries([...byDate.values()]);
+};
+
+const KEY_HEIGHT = 'poids-taille';
+const KEY_REMINDER = 'poids-rappel';
+
+export const getHeight = async () => {
+  const raw = await AsyncStorage.getItem(KEY_HEIGHT);
+  return raw ? parseFloat(raw) : null;
+};
+
+export const setHeight = async (cm) => {
+  if (cm == null) await AsyncStorage.removeItem(KEY_HEIGHT);
+  else await AsyncStorage.setItem(KEY_HEIGHT, String(cm));
+  return cm;
+};
+
+export const getReminder = async () => {
+  const raw = await AsyncStorage.getItem(KEY_REMINDER);
+  return raw ? JSON.parse(raw) : { enabled: false, hour: 8, minute: 0 };
+};
+
+export const setReminder = async (reminder) => {
+  await AsyncStorage.setItem(KEY_REMINDER, JSON.stringify(reminder));
+  return reminder;
+};

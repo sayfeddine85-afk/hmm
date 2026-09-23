@@ -127,3 +127,60 @@ export const estimateGoalDate = (current, goal, slopePerDay) => {
   if (days <= 0 || days > 5 * 365) return null;
   return addDaysISO(todayISO(), days);
 };
+
+// Garde les entrées des `days` derniers jours calendaires (relatif à la dernière pesée).
+export const filterByDays = (data, days) => {
+  if (!data?.length || !days) return data ?? [];
+  const cutoff = addDaysISO(data[data.length - 1].date, -(days - 1));
+  return data.filter((d) => d.date >= cutoff);
+};
+
+// Statistiques d'une fenêtre : moyenne, min, max, variation première → dernière.
+export const rangeStats = (data) => {
+  if (!data?.length) return null;
+  const poids = data.map((d) => d.poids);
+  return {
+    avg: round(poids.reduce((a, b) => a + b, 0) / poids.length, 1),
+    min: Math.min(...poids),
+    max: Math.max(...poids),
+    delta: round(poids[poids.length - 1] - poids[0], 1),
+    count: poids.length,
+  };
+};
+
+// IMC = poids / taille² (taille en cm).
+export const computeBMI = (poids, tailleCm) => {
+  if (!poids || !tailleCm) return null;
+  const m = tailleCm / 100;
+  return round(poids / (m * m), 1);
+};
+
+// Catégories OMS de l'IMC adulte.
+export const bmiCategory = (bmi) => {
+  if (bmi == null) return null;
+  if (bmi < 18.5) return { label: 'Insuffisance', tone: 'accent' };
+  if (bmi < 25) return { label: 'Normal', tone: 'down' };
+  if (bmi < 30) return { label: 'Surpoids', tone: 'ma5' };
+  return { label: 'Obésité', tone: 'up' };
+};
+
+// Compare la moyenne du mois de `refIso` avec celle du mois précédent.
+export const compareMonths = (data, refIso = todayISO()) => {
+  const ref = parseISO(refIso);
+  const prev = new Date(ref.getFullYear(), ref.getMonth() - 1, 1);
+  const curKey = monthKey(refIso);
+  const prevKey = `${prev.getFullYear()}-${String(prev.getMonth() + 1).padStart(2, '0')}`;
+  const avg = (key) => {
+    const vals = data.filter((d) => monthKey(d.date) === key).map((d) => d.poids);
+    return vals.length ? round(vals.reduce((a, b) => a + b, 0) / vals.length, 2) : null;
+  };
+  const current = avg(curKey);
+  const previous = avg(prevKey);
+  return {
+    current,
+    previous,
+    delta: current != null && previous != null ? round(current - previous, 2) : null,
+    prevMonthIndex: prev.getMonth(),
+    curMonthIndex: ref.getMonth(),
+  };
+};

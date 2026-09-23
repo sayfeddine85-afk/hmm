@@ -68,3 +68,5 @@ export const daysInMonthOf = (iso) => {
 
 // "2026-05-15" → "2026-05"
 export const monthKey = (iso) => iso.slice(0, 7);
+
+export const monthNameFR = (monthIndex) => MONTHS_FR[monthIndex];

@@ -1,9 +1,10 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import {
-  View, Text, StyleSheet, ScrollView, TextInput, Pressable, RefreshControl,
+  View, Text, StyleSheet, ScrollView, Pressable, RefreshControl,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
+import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 
 import colors from '../theme/colors';
@@ -11,35 +12,29 @@ import StatCard from '../components/StatCard';
 import MA5Badge from '../components/MA5Badge';
 import WeightChart from '../components/WeightChart';
 import {
-  loadEntries, getReference, setReference, DEFAULT_REFERENCE,
+  loadEntries, getReference, getHeight, getObjectif, DEFAULT_REFERENCE,
 } from '../storage/store';
-import { computeMA5, computeStats, round } from '../utils/calculations';
-import { toDisplay, toLongFR } from '../utils/dates';
+import {
+  computeMA5, computeStats, computeBMI, bmiCategory,
+} from '../utils/calculations';
+import { toLongFR, todayISO, daysBetween } from '../utils/dates';
 
 export default function HomeScreen({ navigation }) {
   const [entries, setEntries] = useState([]);
   const [reference, setRef] = useState(DEFAULT_REFERENCE);
-  const [refInput, setRefInput] = useState(String(DEFAULT_REFERENCE));
+  const [height, setHeightState] = useState(null);
+  const [objectif, setObjectif] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
 
   const reload = useCallback(async () => {
-    const data = await loadEntries();
-    const ref = await getReference();
-    setEntries(computeMA5(data));
-    setRef(ref);
-    setRefInput(String(ref));
+    setEntries(computeMA5(await loadEntries()));
+    setRef(await getReference());
+    setHeightState(await getHeight());
+    setObjectif(await getObjectif());
   }, []);
 
-  useEffect(() => {
-    reload();
-  }, [reload]);
-
-  // Recharge à chaque retour sur l'onglet (après ajout/suppression).
-  useFocusEffect(
-    useCallback(() => {
-      reload();
-    }, [reload]),
-  );
+  // Recharge à chaque retour sur l'onglet (après ajout/suppression/réglages).
+  useFocusEffect(useCallback(() => { reload(); }, [reload]));
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -51,19 +46,17 @@ export default function HomeScreen({ navigation }) {
   const last = entries[entries.length - 1];
   const last20 = entries.slice(-20);
   const ma5History = entries.filter((e) => e.ma5 != null).slice(-10);
+  const bmi = computeBMI(last?.poids, height);
+  const bmiCat = bmiCategory(bmi);
+  const weighedToday = last?.date === todayISO();
+  const daysSince = last ? daysBetween(last.date, todayISO()) : null;
 
   const ma5DeltaTone =
     stats.ma5Delta == null ? colors.textDim : stats.ma5Delta > 0 ? colors.up : colors.down;
 
-  const commitReference = async () => {
-    const v = parseFloat(refInput.replace(',', '.'));
-    if (!Number.isNaN(v) && v >= 30 && v <= 200) {
-      await setReference(v);
-      setRef(v);
-      Haptics.selectionAsync();
-    } else {
-      setRefInput(String(reference));
-    }
+  const goAdd = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    navigation.navigate('Ajouter');
   };
 
   return (
@@ -75,85 +68,83 @@ export default function HomeScreen({ navigation }) {
         }
       >
         <View style={styles.header}>
-          <Text style={styles.kicker}>Aujourd'hui</Text>
-          <Text style={styles.date}>{last ? toLongFR(last.date) : ''}</Text>
+          <Text style={styles.kicker}>{weighedToday ? "AUJOURD'HUI" : 'DERNIÈRE PESÉE'}</Text>
+          <Text style={styles.date}>{last ? toLongFR(last.date) : 'Aucune pesée'}</Text>
           <View style={styles.bigRow}>
             <Text style={styles.bigValue}>{last?.poids?.toFixed(1) ?? '—'}</Text>
             <Text style={styles.bigUnit}>kg</Text>
           </View>
         </View>
 
+        {!weighedToday ? (
+          <Pressable onPress={goAdd} style={styles.banner}>
+            <Ionicons name="scale-outline" size={20} color={colors.accent} />
+            <Text style={styles.bannerText}>
+              {daysSince != null && daysSince > 1
+                ? `Pas de pesée depuis ${daysSince} jours — ajoute celle du jour`
+                : "Pas encore de pesée aujourd'hui — touche pour l'ajouter"}
+            </Text>
+            <Ionicons name="chevron-forward" size={18} color={colors.textDim} />
+          </Pressable>
+        ) : null}
+
         <View style={styles.grid}>
           <View style={styles.row}>
             <StatCard
-              title="Poids actuel"
-              icon="⚖️"
-              value={stats.current != null ? `${stats.current.toFixed(1)}` : '—'}
-              subtitle="kg"
-              color={colors.brut}
-            />
-            <View style={{ width: 12 }} />
-            <StatCard
               title="MA5"
-              icon="📊"
               value={stats.ma5Current != null ? stats.ma5Current.toFixed(2) : '—'}
-              subtitle="moyenne 5 entrées"
+              subtitle="moyenne 5 pesées"
               color={colors.ma5}
             />
-          </View>
-          <View style={{ height: 12 }} />
-          <View style={styles.row}>
+            <View style={styles.gap} />
             <StatCard
-              title="Δ MA5 (vs J-7)"
-              icon="📈"
+              title="Δ MA5 (7 pesées)"
               value={
                 stats.ma5Delta != null
                   ? `${stats.ma5Delta > 0 ? '+' : ''}${stats.ma5Delta.toFixed(2)}`
                   : '—'
               }
-              subtitle="kg sur la fenêtre"
+              subtitle="kg"
               color={ma5DeltaTone}
             />
-            <View style={{ width: 12 }} />
+          </View>
+          <View style={styles.vgap} />
+          <View style={styles.row}>
             <StatCard
               title="Min — Max"
-              icon="🎯"
-              value={
-                stats.min != null
-                  ? `${stats.min.toFixed(1)} – ${stats.max.toFixed(1)}`
-                  : '—'
-              }
+              value={stats.min != null ? `${stats.min.toFixed(1)} – ${stats.max.toFixed(1)}` : '—'}
               subtitle={`${stats.count} pesées`}
               color={colors.accent}
             />
+            <View style={styles.gap} />
+            {bmi != null ? (
+              <StatCard
+                title="IMC"
+                value={bmi.toFixed(1)}
+                subtitle={bmiCat.label}
+                color={colors[bmiCat.tone]}
+              />
+            ) : objectif != null && stats.current != null ? (
+              <StatCard
+                title="Objectif"
+                value={`${Math.abs(stats.current - objectif).toFixed(1)}`}
+                subtitle={`kg restants → ${objectif}`}
+                color={colors.brut}
+              />
+            ) : (
+              <StatCard
+                title="IMC"
+                value="—"
+                subtitle="Taille dans Réglages"
+                color={colors.textDim}
+              />
+            )}
           </View>
         </View>
 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>20 dernières pesées</Text>
-          <WeightChart
-            data={last20}
-            referenceLine={reference}
-            compact
-            range="all"
-          />
-        </View>
-
-        <View style={styles.refRow}>
-          <Text style={styles.refLabel}>Référence</Text>
-          <TextInput
-            value={refInput}
-            onChangeText={setRefInput}
-            onBlur={commitReference}
-            keyboardType="decimal-pad"
-            style={styles.refInput}
-            placeholder="79.5"
-            placeholderTextColor={colors.textFaint}
-          />
-          <Text style={styles.refUnit}>kg</Text>
-          <Pressable onPress={commitReference} style={styles.refBtn}>
-            <Text style={styles.refBtnText}>OK</Text>
-          </Pressable>
+          <WeightChart data={last20} referenceLine={reference} objectif={objectif} compact />
         </View>
 
         <View style={styles.section}>
@@ -168,14 +159,8 @@ export default function HomeScreen({ navigation }) {
         <View style={{ height: 100 }} />
       </ScrollView>
 
-      <Pressable
-        style={styles.fab}
-        onPress={() => {
-          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-          navigation.navigate('Ajouter');
-        }}
-      >
-        <Text style={styles.fabText}>+</Text>
+      <Pressable style={({ pressed }) => [styles.fab, pressed && { opacity: 0.85 }]} onPress={goAdd}>
+        <Ionicons name="add" size={32} color={colors.bg} />
       </Pressable>
     </SafeAreaView>
   );
@@ -184,14 +169,27 @@ export default function HomeScreen({ navigation }) {
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.bg },
   scroll: { padding: 16 },
-  header: { marginBottom: 18 },
+  header: { marginBottom: 14 },
   kicker: { color: colors.textDim, fontSize: 12, fontWeight: '700', letterSpacing: 1 },
   date: { color: colors.text, fontSize: 14, marginTop: 2, textTransform: 'capitalize' },
   bigRow: { flexDirection: 'row', alignItems: 'flex-end', marginTop: 8 },
   bigValue: { color: colors.text, fontSize: 56, fontWeight: '800', letterSpacing: -1 },
   bigUnit: { color: colors.textDim, fontSize: 18, marginLeft: 8, marginBottom: 12, fontWeight: '700' },
+  banner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.card,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: colors.accent,
+    padding: 12,
+    marginBottom: 16,
+  },
+  bannerText: { color: colors.text, flex: 1, marginHorizontal: 10, fontWeight: '600', fontSize: 13 },
   grid: { marginBottom: 18 },
   row: { flexDirection: 'row' },
+  gap: { width: 12 },
+  vgap: { height: 12 },
   section: { marginBottom: 18 },
   sectionTitle: {
     color: colors.textDim,
@@ -201,35 +199,6 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     textTransform: 'uppercase',
   },
-  refRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.card,
-    borderRadius: 12,
-    padding: 12,
-    marginBottom: 18,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  refLabel: { color: colors.text, fontWeight: '700', flex: 1 },
-  refInput: {
-    color: colors.text,
-    backgroundColor: colors.cardAlt,
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    minWidth: 70,
-    textAlign: 'right',
-    fontWeight: '700',
-  },
-  refUnit: { color: colors.textDim, marginHorizontal: 8 },
-  refBtn: {
-    backgroundColor: colors.brut,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 8,
-  },
-  refBtnText: { color: colors.bg, fontWeight: '800' },
   fab: {
     position: 'absolute',
     right: 24,
@@ -241,10 +210,5 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     elevation: 6,
-    shadowColor: '#000',
-    shadowOpacity: 0.4,
-    shadowOffset: { width: 0, height: 4 },
-    shadowRadius: 8,
   },
-  fabText: { color: colors.bg, fontSize: 32, fontWeight: '800', marginTop: -2 },
 });

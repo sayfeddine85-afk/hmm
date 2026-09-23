@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import {
   View, Text, StyleSheet, Pressable, Switch, ScrollView,
 } from 'react-native';
@@ -6,9 +6,9 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 
 import colors from '../theme/colors';
-import WeightChart from '../components/WeightChart';
+import WeightChart, { filterByRange } from '../components/WeightChart';
 import { loadEntries, getReference, getObjectif } from '../storage/store';
-import { computeMA5 } from '../utils/calculations';
+import { computeMA5, rangeStats } from '../utils/calculations';
 
 const RANGES = [
   { key: '7', label: '7 j' },
@@ -31,8 +31,9 @@ export default function ChartScreen() {
     setObjectif(await getObjectif());
   }, []);
 
-  useEffect(() => { reload(); }, [reload]);
   useFocusEffect(useCallback(() => { reload(); }, [reload]));
+
+  const stats = useMemo(() => rangeStats(filterByRange(entries, range)), [entries, range]);
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
@@ -67,6 +68,19 @@ export default function ChartScreen() {
           />
         </View>
 
+        {stats ? (
+          <View style={styles.statsRow}>
+            <MiniStat label="Moyenne" value={`${stats.avg.toFixed(1)}`} />
+            <MiniStat label="Min" value={stats.min.toFixed(1)} color={colors.down} />
+            <MiniStat label="Max" value={stats.max.toFixed(1)} color={colors.up} />
+            <MiniStat
+              label="Variation"
+              value={`${stats.delta > 0 ? '+' : ''}${stats.delta.toFixed(1)}`}
+              color={stats.delta > 0 ? colors.up : stats.delta < 0 ? colors.down : colors.text}
+            />
+          </View>
+        ) : null}
+
         <View style={styles.legend}>
           <Legend color={colors.brut} label="Poids brut" />
           <Legend color={colors.ma5} label="MA5" />
@@ -85,6 +99,15 @@ export default function ChartScreen() {
         </View>
       </ScrollView>
     </SafeAreaView>
+  );
+}
+
+function MiniStat({ label, value, color = colors.text }) {
+  return (
+    <View style={styles.miniStat}>
+      <Text style={styles.miniLabel}>{label}</Text>
+      <Text style={[styles.miniValue, { color }]}>{value}</Text>
+    </View>
   );
 }
 
@@ -124,6 +147,18 @@ const styles = StyleSheet.create({
   segmentText: { color: colors.textDim, fontWeight: '700', fontSize: 13 },
   segmentTextActive: { color: colors.bg },
   chartWrap: { marginTop: 16 },
+  statsRow: {
+    flexDirection: 'row',
+    marginTop: 12,
+    backgroundColor: colors.card,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: colors.border,
+    paddingVertical: 10,
+  },
+  miniStat: { flex: 1, alignItems: 'center' },
+  miniLabel: { color: colors.textDim, fontSize: 11, fontWeight: '700', textTransform: 'uppercase' },
+  miniValue: { fontSize: 16, fontWeight: '800', marginTop: 2 },
   legend: {
     marginTop: 16,
     flexDirection: 'row',

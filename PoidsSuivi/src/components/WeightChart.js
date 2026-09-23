@@ -5,7 +5,7 @@ import { Circle, DashPathEffect } from '@shopify/react-native-skia';
 import { useAnimatedReaction, runOnJS } from 'react-native-reanimated';
 
 import colors from '../theme/colors';
-import { isPeak } from '../utils/calculations';
+import { isPeak, filterByDays } from '../utils/calculations';
 import { toDisplay } from '../utils/dates';
 
 // `data` doit déjà inclure `ma5`. `range` = '7' | '30' | '90' | 'all'.
@@ -182,14 +182,10 @@ function Dot({ color }) {
   return <View style={[styles.dot, { backgroundColor: color }]} />;
 }
 
-function filterByRange(data, range) {
+export function filterByRange(data, range) {
   if (!data?.length) return [];
-  if (range === 'all') return data;
-  const days = range === '7' ? 7 : range === '30' ? 30 : range === '90' ? 90 : null;
-  if (!days) return data;
-  // On filtre par index proche : on garde les `days` dernières entrées (proxy simple).
-  // Comme les pesées ne sont pas exactement quotidiennes, on garde au moins `days` entrées.
-  return data.slice(-Math.min(data.length, days));
+  const days = { 7: 7, 30: 30, 90: 90 }[range];
+  return days ? filterByDays(data, days) : data;
 }
 
 const styles = StyleSheet.create({
